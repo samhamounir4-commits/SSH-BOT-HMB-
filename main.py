@@ -9,50 +9,59 @@ import config
 import asyncio
 import os
 import threading
+from datetime import datetime
 
 app = Flask(__name__)
 db = Database()
 scraper = SSHOceanScraper()
 
+
+async def _send_notification(server, change_type: str):
+    notifier = TelegramNotifier()
+    data = {
+        "host": server.host,
+        "country": server.country,
+        "type": server.server_type,
+        "status": server.status,
+        "remaining": server.accounts_remaining,
+        "url": server.url,
+    }
+
+    if change_type == "new":
+        await notifier.notify_new_servers([data])
+    elif change_type == "online":
+        await notifier.notify_status_change(data, "went_online")
+    elif change_type == "slots":
+        await notifier.notify_status_change(data, "has_slots")
+
+
 def check_servers():
     """Monitoring automatique"""
     print(f"[{datetime.now().strftime('%H:%M:%S')}] 🔍 Vérification...")
-    
+
     try:
         servers = scraper.check_all_servers()
-        
+
         for server in servers:
             changes = db.update_server(server)
-            
-            if changes['is_new'] or changes['went_online'] or changes['has_slots']:
-                notifier = TelegramNotifier()
-                loop = asyncio.new_event_loop()
-                asyncio.set_event_loop(loop)
-                
-                data = {
-                    'host': server.host,
-                    'country': server.country,
-                    'type': server.server_type,
-                    'status': server.status,
-                    'remaining': server.accounts_remaining,
-                    'url': server.url
-                }
-                
-                if changes['is_new']:
-                    loop.run_until_complete(notifier.notify_new_servers([data]))
-                    db.mark_notified(server.host, 'online')
-                elif changes['went_online']:
-                    loop.run_until_complete(notifier.notify_status_change(data, 'went_online'))
-                    db.mark_notified(server.host, 'online')
-                elif changes['has_slots']:
-                    loop.run_until_complete(notifier.notify_status_change(data, 'has_slots'))
-                    db.mark_notified(server.host, 'available')
-                
-                loop.close()
+
+            if changes["is_new"]:
+                asyncio.run(_send_notification(server, "new"))
+                db.mark_notified(server.host, "online")
+
+            elif changes["went_online"]:
+                asyncio.run(_send_notification(server, "online"))
+                db.mark_notified(server.host, "online")
+
+            elif changes["has_slots"]:
+                asyncio.run(_send_notification(server, "slots"))
+                db.mark_notified(server.host, "available")
+
     except Exception as e:
         print(f"Erreur monitoring: {e}")
 
-@app.route('/')
+
+@app.route("/")
 def health():
     stats = db.get_stats()
     return {
@@ -60,18 +69,23 @@ def health():
         "bot": config.BOT_NAME,
         "version": config.VERSION,
         "creator": config.CREATOR,
-        "online": stats['online'],
-        "offline": stats['offline']
+        "online": stats["online"],
+        "offline": stats["offline"],
     }
 
+
 def run_flask():
-    port = int(os.environ.get('PORT', 10000))
-    app.run(host='0.0.0.0', port=port, debug=False)
+    port = int(os.environ.get("PORT", 10000))
+    app.run(host="0.0.0.0", port=port, debug=False, use_reloader=False)
+
 
 def run_telegram():
-    """Lance le bot Telegram"""
-    application = Application.builder().token(config.TELEGRAM_TOKEN).build()
-    
+    token = config.TELEGRAM_TOKEN
+    if not token:
+        raise RuntimeError("TELEGRAM_TOKEN manquant dans les variables d'environnement.")
+
+    application = Application.builder().token(token).build()
+
     # 👑 Essentielles
     application.add_handler(CommandHandler("start", cmd.start))
     application.add_handler(CommandHandler("help", cmd.help_command))
@@ -81,7 +95,7 @@ def run_telegram():
     application.add_handler(CommandHandler("stats", cmd.stats))
     application.add_handler(CommandHandler("check", cmd.check))
     application.add_handler(CommandHandler("refresh", cmd.refresh))
-    
+
     # 💎 Serveurs
     application.add_handler(CommandHandler("servers", cmd.servers))
     application.add_handler(CommandHandler("online", cmd.online))
@@ -92,45 +106,45 @@ def run_telegram():
     application.add_handler(CommandHandler("search", cmd.search))
     application.add_handler(CommandHandler("host", cmd.host))
     application.add_handler(CommandHandler("info", cmd.info))
-    
+
     # 🌟 Système
     application.add_handler(CommandHandler("alerts", cmd.alerts))
     application.add_handler(CommandHandler("ping", cmd.ping))
     application.add_handler(CommandHandler("uptime", cmd.uptime))
     application.add_handler(CommandHandler("version", cmd.version))
     application.add_handler(CommandHandler("about", cmd.about))
-    
+
     # Callbacks boutons
     application.add_handler(CallbackQueryHandler(cmd.button_callback))
-    
-    # Webhook pour Render
-    webhook_url = os.environ.get('WEBHOOK_URL')
-    if webhook_url:
-        application.run_webhook(
-            listen="0.0.0.0",
-            port=int(os.environ.get('PORT', 10000)),
-            webhook_url=webhook_url
-        )
-    else:
-        application.run_polling()
+
+    # Polling simple et stable
+    application.run_polling()
+
 
 def main():
     # Premier check
     check_servers()
-    
+
     # Scheduler
     scheduler = BackgroundScheduler()
-    scheduler.add_job(check_servers, 'interval', minutes=3, id='monitor')
+    scheduler.add_job(
+        check_servers,
+        "interval",
+        minutes=5,
+        id="monitor",
+        coalesce=True,
+        max_instances=1,
+        misfire_grace_time=60,
+    )
     scheduler.start()
-    
+
     # Lancer Flask dans un thread séparé
-    flask_thread = threading.Thread(target=run_flask)
-    flask_thread.daemon = True
+    flask_thread = threading.Thread(target=run_flask, daemon=True)
     flask_thread.start()
-    
+
     # Lancer Telegram (bloquant)
     run_telegram()
 
-if __name__ == '__main__':
-    from datetime import datetime
+
+if __name__ == "__main__":
     main()
