@@ -104,16 +104,8 @@ def run_telegram():
     # Callbacks boutons
     application.add_handler(CallbackQueryHandler(cmd.button_callback))
 
-    # Webhook pour Render
-    webhook_url = os.environ.get('WEBHOOK_URL')
-    if webhook_url:
-        application.run_webhook(
-            listen="0.0.0.0",
-            port=int(os.environ.get('PORT', 10000)),
-            webhook_url=webhook_url
-        )
-    else:
-        application.run_polling()
+    # Démarrer le bot en mode polling
+    application.run_polling(drop_pending_updates=True)
 
 def main():
     # Premier check
