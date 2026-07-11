@@ -15,7 +15,7 @@ UDP_SERVERS = {
     "france": "https://sshocean.com/ssh-udp/france",
     "germany": "https://sshocean.com/ssh-udp/germany",
     "netherlands": "https://sshocean.com/ssh-udp/netherlands",
-    "poland": "https://sshocean.com/ssh-udp/polan",
+    "poland": "https://sshocean.com/ssh-udp/poland",
     "uk": "https://sshocean.com/ssh-udp/united-kingdom",
     "us": "https://sshocean.com/ssh-udp/united-states",
 }
