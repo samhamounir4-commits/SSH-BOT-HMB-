@@ -27,8 +27,6 @@ def check_servers():
 
             if changes['is_new'] or changes['went_online'] or changes['has_slots']:
                 notifier = TelegramNotifier()
-                loop = asyncio.new_event_loop()
-                asyncio.set_event_loop(loop)
 
                 data = {
                     'host': server.host,
@@ -40,16 +38,15 @@ def check_servers():
                 }
 
                 if changes['is_new']:
-                    loop.run_until_complete(notifier.notify_new_servers([data]))
+                    asyncio.run(notifier.notify_new_servers([data]))
                     db.mark_notified(server.host, 'online')
                 elif changes['went_online']:
-                    loop.run_until_complete(notifier.notify_status_change(data, 'went_online'))
+                    asyncio.run(notifier.notify_status_change(data, 'went_online'))
                     db.mark_notified(server.host, 'online')
                 elif changes['has_slots']:
-                    loop.run_until_complete(notifier.notify_status_change(data, 'has_slots'))
+                    asyncio.run(notifier.notify_status_change(data, 'has_slots'))
                     db.mark_notified(server.host, 'available')
 
-                loop.close()
     except Exception as e:
         print(f"Erreur monitoring: {e}")
 
