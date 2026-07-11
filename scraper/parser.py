@@ -90,7 +90,7 @@ class SSHOceanScraper:
         if not html:
             return None
 
-        soup = BeautifulSoup(html, "lxml")
+        soup = BeautifulSoup(html, "html.parser")
 
         host = self._extract_host(html)
         status = self._extract_status(html, soup)
