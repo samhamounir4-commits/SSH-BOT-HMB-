@@ -21,13 +21,13 @@ class SSHOceanScraper:
         self.scraper = cloudscraper.create_scraper()
 
     def fetch_page(self, url: str) -> Optional[str]:
-    try:
-        response = self.scraper.get(url, timeout=30)
-        print(f"[FETCH] {url} -> {response.status_code} | {len(response.text)} chars")
-        return response.text
-    except Exception as e:
-        print(f"Erreur fetch {url}: {e}")
-        return None
+        try:
+            response = self.scraper.get(url, timeout=30)
+            print(f"[FETCH] {url} -> {response.status_code} | {len(response.text)} chars")
+            return response.text
+        except Exception as e:
+            print(f"Erreur fetch {url}: {e}")
+            return None
 
     def parse_server_card(self, html: str, country: str, server_type: str, url: str) -> Optional[ServerInfo]:
         if not html:
