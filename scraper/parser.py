@@ -22,8 +22,25 @@ class SSHOceanScraper:
 
     def fetch_page(self, url: str) -> Optional[str]:
         try:
-            response = self.scraper.get(url, timeout=30)
+            headers = {
+                "User-Agent": (
+                    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                    "AppleWebKit/537.36 (KHTML, like Gecko) "
+                    "Chrome/126.0.0.0 Safari/537.36"
+                ),
+                "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+                "Accept-Language": "en-US,en;q=0.9",
+                "Referer": "https://sshocean.com/",
+                "Connection": "keep-alive",
+            }
+
+            response = self.scraper.get(url, headers=headers, timeout=30)
             print(f"[FETCH] {url} -> {response.status_code} | {len(response.text)} chars")
+
+            if response.status_code != 200:
+                print(response.text[:300])
+                return None
+
             return response.text
         except Exception as e:
             print(f"Erreur fetch {url}: {e}")
@@ -33,7 +50,7 @@ class SSHOceanScraper:
         if not html:
             return None
 
-        soup = BeautifulSoup(html, 'lxml')
+        soup = BeautifulSoup(html, 'html.parser')
 
         # Host
         host_match = re.search(r'[a-z0-9]+\.ssht\.site', html)
